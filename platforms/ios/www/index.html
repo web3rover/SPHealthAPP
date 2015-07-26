@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
+        <title>HealthKit</title>
+
+        <link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+ 
+        <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+        <script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+        <script type="text/javascript" src="cordova.js"></script>
+    </head>
+    <body>      
+
+        <div data-role="page" id="home">
+          <div data-role="header">
+            <h1>Home</h1>
+          </div>
+         
+          <div data-role="main" class="ui-content">
+            <p>
+                <a target="_blank" href="#add" style="text-decoration: none"><button>Add Health Data</button></a>
+                <a target="_blank" href="#display" style="text-decoration: none"><button>Display Health Data</button></a>
+            </p>
+          </div>
+        </div>
+
+        <div data-role="page" id="not-supported">
+          <div data-role="header">
+            <h1>Error</h1>
+          </div>
+         
+          <div data-role="main" class="ui-content">
+            <p>
+                <h4 id="error-info">Unfortunately HealthKit is not available in this device.</h4>
+            </p>
+          </div>
+        </div>
+
+        <div data-role="page" id="add">
+          <div data-role="header">
+            <a target="_blank" href="#home" class="ui-btn ui-icon-home ui-btn-icon-left">Home</a>
+            <h1>Enter</h1>
+          </div>
+         
+          <div data-role="main" class="ui-content">
+            <input type="number" id="height" placeholder="Enter Height" />
+            <input type="number" id="weight" placeholder="Enter Weight" />
+            <input type="number" id="vitaminc" placeholder="Enter Vitamin C" />
+            <a target="_blank" href="javascript:add_data()" style="text-decoration: none"><button>Add</button></a>
+          </div>
+        </div>
+
+        <div data-role="page" id="display">
+          <div data-role="header">
+            <a target="_blank" href="#home" class="ui-btn ui-icon-home ui-btn-icon-left">Home</a>
+            <h1>Display</h1>
+          </div>
+         
+          <div data-role="main" class="ui-content">
+            <table data-role="table" data-mode="column" id="allTable" class="ui-responsive table-stroke">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <script type="text/javascript">
+            document.addEventListener("deviceready", function(){
+                window.plugins.healthkit.available(function(isAvailable){
+                    if(isAvailable == false)
+                    {
+                        document.getElementById("error-info").innerHTML = "Unfortunately HealthKit is not available in this device.";
+                        $.mobile.changePage("#not-supported");
+                    }
+                  }
+                );
+
+                window.plugins.healthkit.requestAuthorization({
+                        "readTypes"  : ["HKQuantityTypeIdentifierHeight", "HKQuantityTypeIdentifierBodyMass", "HKQuantityTypeIdentifierDietaryVitaminC"],
+                        "writeTypes" : ["HKQuantityTypeIdentifierHeight", "HKQuantityTypeIdentifierBodyMass", "HKQuantityTypeIdentifierDietaryVitaminC"]
+                    },
+                    null,
+                    function(){
+                        document.getElementById("error-info").innerHTML = "APP doesn't have sufficient permission";
+                        $.mobile.changePage("#not-supported");
+                    }
+                );
+
+            }, false);
+
+            function add_data()
+            {
+              window.plugins.healthkit.checkAuthStatus({
+                  "type"  : "HKQuantityTypeIdentifierHeight" 
+                },
+                function(){
+                  var height = document.getElementById("height").value;
+                  if(height != "")
+                  {
+                    window.plugins.healthkit.saveQuantitySample({
+                          "sampleType": "HKQuantityTypeIdentifierHeight",
+                          "startDate": new Date(),
+                          "endDate": new Date(),
+                          "unit": "in",
+                          "amount": height 
+                      }
+                    );
+                  }
+                }
+              );
+
+              window.plugins.healthkit.checkAuthStatus({
+                  "type"  : "HKQuantityTypeIdentifierBodyMass" 
+                },
+                function(){
+                  var weight = document.getElementById("weight").value;
+                  if(weight != "")
+                  {
+                    window.plugins.healthkit.saveQuantitySample({
+                          "sampleType": "HKQuantityTypeIdentifierBodyMass",
+                          "startDate": new Date(),
+                          "endDate": new Date(),
+                          "unit": "kg",
+                          "amount": weight 
+                      }
+                    );
+                  }
+                }
+              );
+
+              window.plugins.healthkit.checkAuthStatus({
+                  "type"  : "HKQuantityTypeIdentifierDietaryVitaminC" 
+                },
+                function(){
+                  var vitaminc = document.getElementById("vitaminc").value;
+                  if(vitaminc != "")
+                  {
+                    window.plugins.healthkit.saveCorrelation({
+                      "startDate": new Date(),
+                      "endDate": new Date(),
+                      "correlationType": "HKCorrelationTypeIdentifierFood",
+                      "samples": [
+                        {
+                          "startDate": Math.round(new Date().getTime()/1000),
+                          "endDate": Math.round(new Date().getTime()/1000),
+                          "sampleType": "HKQuantityTypeIdentifierDietaryVitaminC",
+                          "unit": "g",
+                          "amount": vitaminc
+                        }]
+                      }
+                    );
+                  }
+                }
+              );   
+
+              navigator.notification.alert("Updated Successfully");  
+            }
+
+            $(document).on("pagebeforeshow","#display",function(){
+                
+                $("table#allTable tbody").empty();
+
+                window.plugins.healthkit.checkAuthStatus({
+                    "type"  : "HKQuantityTypeIdentifierHeight" 
+                  },
+                  function(){
+                    window.plugins.healthkit.querySampleType({
+                            "sampleType": "HKQuantityTypeIdentifierHeight",
+                            "startDate": new Date(new Date().getTime() - 90*24*60*60*1000), 
+                            "endDate": new Date(),
+                            "unit": "in"
+                        },
+                        function(value){
+                            if(value[0] != undefined)
+                            {
+                              var html = "";
+                              html = html + "<tr><td>" + "Height" + "</td><td>" + value[0].quantity + "in</td></tr>";
+                              $("table#allTable tbody").append(html).closest("table#allTable").table("refresh").trigger("create");  
+                            }
+                        }
+                    );
+                  }
+                );
+
+                window.plugins.healthkit.checkAuthStatus({
+                    "type"  : "HKQuantityTypeIdentifierBodyMass" 
+                  },
+                  function(){
+                    window.plugins.healthkit.querySampleType({
+                            "sampleType": "HKQuantityTypeIdentifierBodyMass",
+                            "startDate": new Date(new Date().getTime() - 90*24*60*60*1000), 
+                            "endDate": new Date(),
+                            "unit": "kg"
+                        },
+                        function(value){
+                            if(value[0] != undefined)
+                            {
+                              var html = "";
+                              html = html + "<tr><td>" + "Weight" + "</td><td>" + value[0].quantity + "kg</td></tr>";
+                              $("table#allTable tbody").append(html).closest("table#allTable").table("refresh").trigger("create");  
+                            }
+                        }
+                    );
+                  }
+                );
+
+                window.plugins.healthkit.checkAuthStatus({
+                    "type"  : "HKQuantityTypeIdentifierDietaryVitaminC" 
+                  },
+                  function(){
+
+                  	window.plugins.healthkit.queryCorrelationType({
+        					    "correlationType": "HKCorrelationTypeIdentifierFood",
+        					    "startDate": new Date(new Date().getTime() - 90*24*60*60*1000), 
+                                "endDate": new Date(),
+                                "unit": "g"
+        					  },
+        					  function(value){
+        					  	if(value[0].samples != undefined)
+                      {
+                      	for(var count = 0; count < value[0].samples.length; count++)
+                      	{
+                      		if(value[0].samples[count].sampleType == "HKQuantityTypeIdentifierDietaryVitaminC")
+                      		{
+                      			var html = "";
+                      			html = html + "<tr><td>" + "Vitamin C" + "</td><td>" + value[0].samples[count].value + "g</td></tr>";
+                      			$("table#allTable tbody").append(html).closest("table#allTable").table("refresh").trigger("create");  
+                      			break;
+                      		}
+                      	}
+                      }
+        					  });
+                  }
+                );
+            });
+        </script>
+    </body>
+</html>
